@@ -8,6 +8,8 @@
     "build": "shopify hydrogen build --codegen",
     "dev": "shopify hydrogen dev --codegen",
     "preview": "shopify hydrogen preview --build",
+    "deploy:cloudflare": "npm run build && npx wrangler deploy",
+    "preview:cloudflare": "npm run build && npx wrangler dev",
     "lint": "eslint --no-error-on-unmatched-pattern .",
     "typecheck": "react-router typegen && tsc --noEmit",
     "codegen": "shopify hydrogen codegen && react-router typegen"
