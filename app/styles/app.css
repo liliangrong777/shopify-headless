@@ -416,6 +416,63 @@ button.reset:hover:not(:has(> *)) {
 * routes/__index
 * --------------------------------------------------
 */
+.home {
+  margin: 0 auto;
+  max-width: 1200px;
+  padding: 2rem 1rem 4rem;
+}
+
+.home-hero {
+  margin-bottom: 2rem;
+  max-width: 720px;
+}
+
+.home-hero h1 {
+  font-size: clamp(2rem, 6vw, 4rem);
+  line-height: 1;
+  margin: 0 0 1rem;
+}
+
+.home-hero p {
+  line-height: 1.5;
+}
+
+.eyebrow,
+.product-vendor {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.product-card-body {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+}
+
+.product-card-body h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.product-image-placeholder {
+  aspect-ratio: 1 / 1;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+}
+
+.add-to-cart {
+  cursor: pointer;
+  font: inherit;
+  margin-top: 0.25rem;
+  padding: 0.625rem 0.875rem;
+}
+
+.add-to-cart:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .featured-collection {
   display: block;
   margin-bottom: 2rem;
