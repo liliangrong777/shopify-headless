@@ -20,7 +20,11 @@ img {
 
 body {
   background:
-    radial-gradient(circle at top left, rgba(173, 216, 196, 0.35), transparent 34rem),
+    radial-gradient(
+      circle at top left,
+      rgba(173, 216, 196, 0.35),
+      transparent 34rem
+    ),
     var(--color-page);
   color: #111827;
 }
@@ -573,7 +577,11 @@ button.reset:hover:not(:has(> *)) {
 .home-hero {
   background:
     linear-gradient(135deg, rgba(23, 59, 47, 0.94), rgba(33, 82, 66, 0.86)),
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.22), transparent 18rem);
+    radial-gradient(
+      circle at top right,
+      rgba(255, 255, 255, 0.22),
+      transparent 18rem
+    );
   border-radius: 28px;
   box-shadow: var(--shadow-card);
   color: var(--color-light);
@@ -739,7 +747,10 @@ button.reset:hover:not(:has(> *)) {
 .products-grid {
   display: grid;
   grid-gap: clamp(1rem, 2.5vw, 1.5rem);
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--grid-item-width)), 1fr));
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, var(--grid-item-width)), 1fr)
+  );
   margin-bottom: 2rem;
 }
 

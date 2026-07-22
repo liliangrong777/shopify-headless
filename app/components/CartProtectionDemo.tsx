@@ -1,14 +1,11 @@
 import {CartForm, type OptimisticCart} from '@shopify/hydrogen';
 import {
   ShippingProtection,
-  useShippingProtection,
   type SdkCartData,
-  type SdkCartSetting,
   type ShippingProtectionInfo,
 } from '@captain/shipping-protection-react';
 import {useMemo, type ReactElement} from 'react';
-import {useFetcher, useRouteLoaderData} from 'react-router';
-import type {FetcherWithComponents} from 'react-router';
+import {useRevalidator, useRouteLoaderData} from 'react-router';
 import type {CartApiQueryFragment} from 'storefrontapi.generated';
 import type {RootLoader} from '~/root';
 
@@ -17,35 +14,14 @@ type CartProtectionDemoProps = {
 };
 
 type CaptainShippingProtectionWidgetProps = {
-  checked: boolean;
   className?: string;
-  info: ShippingProtectionInfo;
-  onToggle: (checked: boolean, info: ShippingProtectionInfo) => void;
-  setting: SdkCartSetting | null;
-};
-
-type CaptainUseShippingProtectionParams = {
   cart: SdkCartData;
-  country?: string;
-  currency?: string;
-  locale?: string;
-  onToggle?: (checked: boolean, info: ShippingProtectionInfo) => void;
+  country: string;
+  currency: string;
+  locale: string;
+  onToggle: (checked: boolean, info: ShippingProtectionInfo) => void;
   shop: string;
-  theme?: string;
 };
-
-type CaptainUseShippingProtectionResult = {
-  checked: boolean;
-  error: unknown;
-  info: ShippingProtectionInfo | null;
-  loading: boolean;
-  setting: SdkCartSetting | null;
-  toggle: (checked?: boolean) => void;
-};
-
-const useCaptainShippingProtection = useShippingProtection as unknown as (
-  params: CaptainUseShippingProtectionParams,
-) => CaptainUseShippingProtectionResult;
 
 function CaptainShippingProtectionWidget(
   props: CaptainShippingProtectionWidgetProps,
@@ -55,49 +31,25 @@ function CaptainShippingProtectionWidget(
 
 export function CartProtectionDemo({cart}: CartProtectionDemoProps) {
   const rootData = useRouteLoaderData<RootLoader>('root');
-  const fetcher = useFetcher({key: 'captain-shipping-protection'});
+  const revalidator = useRevalidator();
   const sdkCart = useMemo(() => toSdkCartData(cart), [cart]);
 
   if (!sdkCart || !rootData?.publicStoreDomain) return null;
 
-  return (
-    <CartProtectionDemoContent
-      cart={cart}
-      fetcher={fetcher}
-      sdkCart={sdkCart}
-      shop={rootData.publicStoreDomain}
-    />
-  );
-}
-
-function CartProtectionDemoContent({
-  cart,
-  fetcher,
-  sdkCart,
-  shop,
-}: {
-  cart: OptimisticCart<CartApiQueryFragment | null>;
-  fetcher: FetcherWithComponents<unknown>;
-  sdkCart: SdkCartData;
-  shop: string;
-}) {
-  const protection = useCaptainShippingProtection({
-    cart: sdkCart,
-    shop,
-    locale: 'en',
-    currency: sdkCart.currency,
-    country: 'US',
-    onToggle: handleToggle,
-  });
-
-  if (protection.error || !shouldRenderShippingProtection(protection.info)) {
-    return null;
-  }
-
   function submitCartAction(action: string, inputs: unknown) {
     const formData = new FormData();
     formData.set(CartForm.INPUT_NAME, JSON.stringify({action, inputs}));
-    void fetcher.submit(formData, {method: 'POST', action: '/cart'});
+
+    void fetch('/cart', {
+      body: formData,
+      method: 'POST',
+    })
+      .then(() => {
+        void revalidator.revalidate();
+      })
+      .catch((error: unknown) => {
+        console.error(error);
+      });
   }
 
   function handleToggle(checked: boolean, info: ShippingProtectionInfo) {
@@ -121,22 +73,14 @@ function CartProtectionDemoContent({
 
   return (
     <CaptainShippingProtectionWidget
-      checked={protection.checked}
-      info={protection.info}
-      setting={protection.setting}
-      onToggle={(checked) => protection.toggle(checked)}
+      cart={sdkCart}
+      className="cart-protection-demo"
+      shop={rootData.publicStoreDomain}
+      locale="en"
+      currency={sdkCart.currency}
+      country="US"
+      onToggle={handleToggle}
     />
-  );
-}
-
-function shouldRenderShippingProtection(
-  info: ShippingProtectionInfo | null,
-): info is ShippingProtectionInfo {
-  return Boolean(
-    info &&
-      info.hasRealProduct &&
-      !info.isHiddenTransportInsurance &&
-      info.checkDisplayShow,
   );
 }
 
