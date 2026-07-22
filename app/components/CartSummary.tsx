@@ -22,6 +22,10 @@ const CaptainShippingProtectionWidget =
     cart: SdkCartData;
     shop: string;
     onToggle: (checked: boolean, info: ShippingProtectionInfo) => void;
+    country?: string;
+    locale: string;
+    currency: string;
+    theme?: string;
   }>;
 
 type CartSummaryProps = {
@@ -93,6 +97,9 @@ function CaptainShippingProtection({
   return createElement(CaptainShippingProtectionWidget, {
     cart: sdkCart,
     shop: rootData.publicStoreDomain,
+    locale: 'en',
+    currency: 'USD',
+    country: 'US',
     onToggle: handleToggle,
   });
 }
