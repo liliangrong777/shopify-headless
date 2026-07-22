@@ -6,6 +6,14 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@captain/shipping-protection-react':
+        '/Users/liliangrong/Desktop/work/cw3-insurance-captain-web-client/SDK/shipping-protection-react/src/index.tsx',
+      '@captain/shipping-protection-sdk':
+        '/Users/liliangrong/Desktop/work/cw3-insurance-captain-web-client/SDK/shipping-protection-sdk/src/index.ts',
+    },
+  },
   plugins: [
     tailwindcss(),
     hydrogen(),
@@ -35,5 +43,11 @@ export default defineConfig({
   },
   server: {
     allowedHosts: ['.tryhydrogen.dev'],
+    fs: {
+      allow: [
+        '/Users/liliangrong/Desktop/work/cw3-insurance-headless-storefront',
+        '/Users/liliangrong/Desktop/work/cw3-insurance-captain-web-client/SDK',
+      ],
+    },
   },
 });
