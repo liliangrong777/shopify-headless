@@ -7,6 +7,7 @@ import {
 import {useEffect, useMemo, useRef, type ReactElement} from 'react';
 import {useFetcher, useRouteLoaderData} from 'react-router';
 import type {CartApiQueryFragment} from 'storefrontapi.generated';
+import {CAPTAIN_CART_ACTIONS} from '~/lib/cart-actions';
 import type {RootLoader} from '~/root';
 
 type CartProtectionDemoProps = {
@@ -29,6 +30,7 @@ type CaptainShippingProtectionWidgetProps = {
   country: string;
   currency: string;
   locale: string;
+  onInfoChange?: (info: ShippingProtectionInfo) => void;
   onToggle: (
     checked: boolean,
     info: ShippingProtectionInfo,
@@ -128,6 +130,43 @@ export function CartProtectionDemo({cart}: CartProtectionDemoProps) {
     }
   }
 
+  function handleInfoChange(info: ShippingProtectionInfo) {
+    if (!info.includedProtection || info.isExcluded) return;
+
+    const insuranceLines = findInsuranceLines(cart, info);
+    const targetVariantId = String(info.variantsId);
+    const staleLineIds = insuranceLines
+      .filter(
+        (line) =>
+          gidToNumericId(line.merchandise.id) !== targetVariantId,
+      )
+      .map((line) => line.id);
+
+    if (!staleLineIds.length) return;
+
+    const hasTargetVariant = insuranceLines.some(
+      (line) => gidToNumericId(line.merchandise.id) === targetVariantId,
+    );
+    const action = hasTargetVariant
+      ? CartForm.ACTIONS.LinesRemove
+      : CAPTAIN_CART_ACTIONS.ProtectionLineReplace;
+    const inputs = hasTargetVariant
+      ? {lineIds: staleLineIds}
+      : {
+          lineIds: staleLineIds,
+          lines: [
+            {
+              merchandiseId: variantNumericIdToGid(info.variantsId),
+              quantity: 1,
+            },
+          ],
+        };
+
+    void submitCartAction(action, inputs).catch((error: unknown) => {
+      console.error('Captain shipping protection line sync failed', error);
+    });
+  }
+
   return (
     <CaptainShippingProtectionWidget
       cart={sdkCart}
@@ -136,6 +175,7 @@ export function CartProtectionDemo({cart}: CartProtectionDemoProps) {
       locale="en"
       currency={sdkCart.currency}
       country="US"
+      onInfoChange={handleInfoChange}
       onToggle={handleToggle}
     />
   );
@@ -184,6 +224,13 @@ function findInsuranceLineIds(
   cart: OptimisticCart<CartApiQueryFragment | null>,
   info: ShippingProtectionInfo,
 ) {
+  return findInsuranceLines(cart, info).map((line) => line.id);
+}
+
+function findInsuranceLines(
+  cart: OptimisticCart<CartApiQueryFragment | null>,
+  info: ShippingProtectionInfo,
+) {
   const insuranceProductId = String(info.productId);
   const insuranceVariantId = String(info.variantsId);
 
@@ -195,8 +242,7 @@ function findInsuranceLineIds(
       return (
         productId === insuranceProductId || variantId === insuranceVariantId
       );
-    })
-    .map((line) => line.id);
+    });
 }
 
 function gidToNumericId(gid?: string | null) {
