@@ -4,13 +4,23 @@ import {
   type SdkCartData,
   type ShippingProtectionInfo,
 } from '@captain/shipping-protection-react';
-import {useMemo, type ReactElement} from 'react';
-import {useRevalidator, useRouteLoaderData} from 'react-router';
+import {useEffect, useMemo, useRef, type ReactElement} from 'react';
+import {useFetcher, useRouteLoaderData} from 'react-router';
 import type {CartApiQueryFragment} from 'storefrontapi.generated';
 import type {RootLoader} from '~/root';
 
 type CartProtectionDemoProps = {
   cart: OptimisticCart<CartApiQueryFragment | null>;
+};
+
+type CartActionResult = {
+  errors?: unknown[];
+  warnings?: unknown[];
+};
+
+type PendingCartAction = {
+  reject: (reason?: unknown) => void;
+  resolve: () => void;
 };
 
 type CaptainShippingProtectionWidgetProps = {
@@ -34,30 +44,69 @@ function CaptainShippingProtectionWidget(
 
 export function CartProtectionDemo({cart}: CartProtectionDemoProps) {
   const rootData = useRouteLoaderData<RootLoader>('root');
-  const revalidator = useRevalidator();
+  const fetcher = useFetcher<CartActionResult>();
+  const pendingCartAction = useRef<PendingCartAction | null>(null);
   const sdkCart = useMemo(() => toSdkCartData(cart), [cart]);
+
+  useEffect(() => {
+    if (fetcher.state !== 'idle' || !pendingCartAction.current) return;
+
+    const pending = pendingCartAction.current;
+    pendingCartAction.current = null;
+
+    if (fetcher.data?.errors?.length) {
+      console.error(
+        'Captain shipping protection cart mutation failed',
+        fetcher.data,
+      );
+      pending.reject(
+        new Error('Captain shipping protection cart mutation failed'),
+      );
+      return;
+    }
+
+    pending.resolve();
+  }, [fetcher.data, fetcher.state]);
+
+  useEffect(
+    () => () => {
+      pendingCartAction.current?.reject(
+        new Error('Captain shipping protection cart mutation was cancelled'),
+      );
+      pendingCartAction.current = null;
+    },
+    [],
+  );
 
   if (!sdkCart || !rootData?.publicStoreDomain) return null;
 
-  async function submitCartAction(action: string, inputs: unknown) {
-    const formData = new FormData();
-    formData.set(CartForm.INPUT_NAME, JSON.stringify({action, inputs}));
-
-    const response = await fetch('/cart', {
-      body: formData,
-      method: 'POST',
-    });
-    const result = (await response.json()) as {
-      errors?: unknown[];
-      warnings?: unknown[];
-    };
-
-    if (!response.ok || result.errors?.length) {
-      console.error('Captain shipping protection cart mutation failed', result);
-      throw new Error('Captain shipping protection cart mutation failed');
+  function submitCartAction(action: string, inputs: unknown) {
+    if (pendingCartAction.current) {
+      return Promise.reject(
+        new Error('Captain shipping protection cart mutation already pending'),
+      );
     }
 
-    void revalidator.revalidate();
+    return new Promise<void>((resolve, reject) => {
+      pendingCartAction.current = {resolve, reject};
+
+      void fetcher
+        .submit(
+          {
+            [CartForm.INPUT_NAME]: JSON.stringify({action, inputs}),
+          },
+          {
+            action: '/cart',
+            method: 'POST',
+          },
+        )
+        .catch((error: unknown) => {
+          if (!pendingCartAction.current) return;
+
+          pendingCartAction.current = null;
+          reject(error);
+        });
+    });
   }
 
   async function handleToggle(checked: boolean, info: ShippingProtectionInfo) {
