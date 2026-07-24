@@ -1,8 +1,10 @@
 import {CartForm, Image} from '@shopify/hydrogen';
 import {useLoaderData} from 'react-router';
+import {useMemo, useState} from 'react';
 import type {Route} from './+types/_index';
 import {ProductPrice} from '~/components/ProductPrice';
 import {useAside} from '~/components/Aside';
+import type {HomepageProductsQuery} from 'storefrontapi.generated';
 
 export const meta: Route.MetaFunction = () => {
   return [
@@ -42,41 +44,78 @@ export default function Homepage() {
       </section>
 
       <section className="products-grid" aria-label="Products">
-        {products.nodes.map((product) => {
-          const variant = product.variants.nodes[0];
-          const image = product.featuredImage;
-          const canAdd = Boolean(variant?.id && variant.availableForSale);
-
-          return (
-            <article className="product-item" key={product.id}>
-              {image ? (
-                <Image
-                  alt={image.altText || product.title}
-                  aspectRatio="1/1"
-                  data={image}
-                  loading="lazy"
-                  sizes="(min-width: 45em) 25vw, 50vw"
-                />
-              ) : (
-                <div className="product-image-placeholder" />
-              )}
-              <div className="product-card-body">
-                <p className="product-vendor">{product.vendor}</p>
-                <h2>{product.title}</h2>
-                <ProductPrice
-                  price={variant?.price}
-                  compareAtPrice={variant?.compareAtPrice}
-                />
-                <AddToCartButton
-                  availableForSale={canAdd}
-                  merchandiseId={variant?.id}
-                />
-              </div>
-            </article>
-          );
-        })}
+        {products.nodes.map((product) => (
+          <ProductCard key={product.id} product={product} />
+        ))}
       </section>
     </div>
+  );
+}
+
+type HomepageProduct = HomepageProductsQuery['products']['nodes'][number];
+
+function ProductCard({product}: {product: HomepageProduct}) {
+  const image = product.featuredImage;
+  const variants = product.variants.nodes;
+  const firstAvailableVariant =
+    variants.find((variant) => variant.availableForSale) ?? variants[0];
+  const [selectedVariantId, setSelectedVariantId] = useState(
+    firstAvailableVariant?.id ?? '',
+  );
+  const selectedVariant = useMemo(
+    () =>
+      variants.find((variant) => variant.id === selectedVariantId) ??
+      firstAvailableVariant,
+    [firstAvailableVariant, selectedVariantId, variants],
+  );
+  const canAdd = Boolean(selectedVariant?.id && selectedVariant.availableForSale);
+
+  return (
+    <article className="product-item">
+      {image ? (
+        <Image
+          alt={image.altText || product.title}
+          aspectRatio="1/1"
+          data={image}
+          loading="lazy"
+          sizes="(min-width: 45em) 25vw, 50vw"
+        />
+      ) : (
+        <div className="product-image-placeholder" />
+      )}
+      <div className="product-card-body">
+        <p className="product-vendor">{product.vendor}</p>
+        <h2>{product.title}</h2>
+        <ProductPrice
+          price={selectedVariant?.price}
+          compareAtPrice={selectedVariant?.compareAtPrice}
+        />
+        {variants.length > 1 && (
+          <label className="product-variant-picker">
+            <span>Variant</span>
+            <select
+              value={selectedVariant?.id ?? ''}
+              onChange={(event) => setSelectedVariantId(event.target.value)}
+            >
+              {variants.map((variant) => (
+                <option
+                  disabled={!variant.availableForSale}
+                  key={variant.id}
+                  value={variant.id}
+                >
+                  {variant.title}
+                  {variant.availableForSale ? '' : ' - Sold out'}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <AddToCartButton
+          availableForSale={canAdd}
+          merchandiseId={selectedVariant?.id}
+        />
+      </div>
+    </article>
   );
 }
 
@@ -141,9 +180,10 @@ const HOMEPAGE_PRODUCTS_QUERY = `#graphql
           width
           height
         }
-        variants(first: 1) {
+        variants(first: 20) {
           nodes {
             id
+            title
             availableForSale
             price {
               amount
@@ -152,6 +192,10 @@ const HOMEPAGE_PRODUCTS_QUERY = `#graphql
             compareAtPrice {
               amount
               currencyCode
+            }
+            selectedOptions {
+              name
+              value
             }
           }
         }

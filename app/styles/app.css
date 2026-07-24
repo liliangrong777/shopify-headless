@@ -649,6 +649,27 @@ button.reset:hover:not(:has(> *)) {
   margin: 0;
 }
 
+.product-variant-picker {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.product-variant-picker span {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.product-variant-picker select {
+  appearance: none;
+  background: #fff;
+  border: 1px solid rgba(17, 24, 39, 0.14);
+  border-radius: 999px;
+  font: inherit;
+  padding: 0.625rem 0.875rem;
+  width: 100%;
+}
+
 .product-image-placeholder {
   aspect-ratio: 1 / 1;
   background: linear-gradient(135deg, #e5e7eb, #f9fafb);
