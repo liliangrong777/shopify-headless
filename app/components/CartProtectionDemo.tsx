@@ -19,7 +19,10 @@ type CaptainShippingProtectionWidgetProps = {
   country: string;
   currency: string;
   locale: string;
-  onToggle: (checked: boolean, info: ShippingProtectionInfo) => void;
+  onToggle: (
+    checked: boolean,
+    info: ShippingProtectionInfo,
+  ) => void | Promise<void>;
   shop: string;
 };
 
@@ -36,25 +39,30 @@ export function CartProtectionDemo({cart}: CartProtectionDemoProps) {
 
   if (!sdkCart || !rootData?.publicStoreDomain) return null;
 
-  function submitCartAction(action: string, inputs: unknown) {
+  async function submitCartAction(action: string, inputs: unknown) {
     const formData = new FormData();
     formData.set(CartForm.INPUT_NAME, JSON.stringify({action, inputs}));
 
-    void fetch('/cart', {
+    const response = await fetch('/cart', {
       body: formData,
       method: 'POST',
-    })
-      .then(() => {
-        void revalidator.revalidate();
-      })
-      .catch((error: unknown) => {
-        console.error(error);
-      });
+    });
+    const result = (await response.json()) as {
+      errors?: unknown[];
+      warnings?: unknown[];
+    };
+
+    if (!response.ok || result.errors?.length) {
+      console.error('Captain shipping protection cart mutation failed', result);
+      throw new Error('Captain shipping protection cart mutation failed');
+    }
+
+    void revalidator.revalidate();
   }
 
-  function handleToggle(checked: boolean, info: ShippingProtectionInfo) {
+  async function handleToggle(checked: boolean, info: ShippingProtectionInfo) {
     if (checked) {
-      submitCartAction(CartForm.ACTIONS.LinesAdd, {
+      await submitCartAction(CartForm.ACTIONS.LinesAdd, {
         lines: [
           {
             merchandiseId: variantNumericIdToGid(info.variantsId),
@@ -67,7 +75,7 @@ export function CartProtectionDemo({cart}: CartProtectionDemoProps) {
 
     const lineIds = findInsuranceLineIds(cart, info);
     if (lineIds.length) {
-      submitCartAction(CartForm.ACTIONS.LinesRemove, {lineIds});
+      await submitCartAction(CartForm.ACTIONS.LinesRemove, {lineIds});
     }
   }
 

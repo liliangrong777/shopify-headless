@@ -24,57 +24,74 @@ export async function action({request, context}: Route.ActionArgs) {
   let status = 200;
   let result: CartQueryDataReturn;
 
-  switch (action) {
-    case CartForm.ACTIONS.LinesAdd:
-      result = await cart.addLines(inputs.lines);
-      break;
-    case CartForm.ACTIONS.LinesUpdate:
-      result = await cart.updateLines(inputs.lines);
-      break;
-    case CartForm.ACTIONS.LinesRemove:
-      result = await cart.removeLines(inputs.lineIds);
-      break;
-    case CartForm.ACTIONS.DiscountCodesUpdate: {
-      const formDiscountCode = inputs.discountCode;
+  try {
+    switch (action) {
+      case CartForm.ACTIONS.LinesAdd:
+        result = await cart.addLines(inputs.lines);
+        break;
+      case CartForm.ACTIONS.LinesUpdate:
+        result = await cart.updateLines(inputs.lines);
+        break;
+      case CartForm.ACTIONS.LinesRemove:
+        result = await cart.removeLines(inputs.lineIds);
+        break;
+      case CartForm.ACTIONS.DiscountCodesUpdate: {
+        const formDiscountCode = inputs.discountCode;
 
-      // User inputted discount code
-      const discountCodes = (
-        formDiscountCode ? [formDiscountCode] : []
-      ) as string[];
+        // User inputted discount code
+        const discountCodes = (
+          formDiscountCode ? [formDiscountCode] : []
+        ) as string[];
 
-      // Combine discount codes already applied on cart
-      discountCodes.push(...inputs.discountCodes);
+        // Combine discount codes already applied on cart
+        discountCodes.push(...inputs.discountCodes);
 
-      result = await cart.updateDiscountCodes(discountCodes);
-      break;
+        result = await cart.updateDiscountCodes(discountCodes);
+        break;
+      }
+      case CartForm.ACTIONS.GiftCardCodesUpdate: {
+        const formGiftCardCode = inputs.giftCardCode;
+
+        // User inputted gift card code
+        const giftCardCodes = (
+          formGiftCardCode ? [formGiftCardCode] : []
+        ) as string[];
+
+        // Combine gift card codes already applied on cart
+        giftCardCodes.push(...inputs.giftCardCodes);
+
+        result = await cart.updateGiftCardCodes(giftCardCodes);
+        break;
+      }
+      case CartForm.ACTIONS.GiftCardCodesRemove: {
+        const appliedGiftCardIds = inputs.giftCardCodes as string[];
+        result = await cart.removeGiftCardCodes(appliedGiftCardIds);
+        break;
+      }
+      case CartForm.ACTIONS.BuyerIdentityUpdate: {
+        result = await cart.updateBuyerIdentity({
+          ...inputs.buyerIdentity,
+        });
+        break;
+      }
+      default:
+        throw new Error(`${action} cart action is not defined`);
     }
-    case CartForm.ACTIONS.GiftCardCodesUpdate: {
-      const formGiftCardCode = inputs.giftCardCode;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Cart mutation failed';
 
-      // User inputted gift card code
-      const giftCardCodes = (
-        formGiftCardCode ? [formGiftCardCode] : []
-      ) as string[];
-
-      // Combine gift card codes already applied on cart
-      giftCardCodes.push(...inputs.giftCardCodes);
-
-      result = await cart.updateGiftCardCodes(giftCardCodes);
-      break;
-    }
-    case CartForm.ACTIONS.GiftCardCodesRemove: {
-      const appliedGiftCardIds = inputs.giftCardCodes as string[];
-      result = await cart.removeGiftCardCodes(appliedGiftCardIds);
-      break;
-    }
-    case CartForm.ACTIONS.BuyerIdentityUpdate: {
-      result = await cart.updateBuyerIdentity({
-        ...inputs.buyerIdentity,
-      });
-      break;
-    }
-    default:
-      throw new Error(`${action} cart action is not defined`);
+    return data(
+      {
+        cart: null,
+        errors: [{message}],
+        warnings: [],
+        analytics: {
+          cartId: null,
+        },
+      },
+      {status: message.includes('Throttled') ? 429 : 400},
+    );
   }
 
   const cartId = result?.cart?.id;

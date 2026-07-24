@@ -17,21 +17,12 @@ type Pages = {
   "/cart": {
     params: {};
   };
-  "/graphiql": {
-    params: {};
-  };
-  "/subrequest-profiler": {
-    params: {};
-  };
-  "/.well-known/appspecific/com.chrome.devtools.json": {
-    params: {};
-  };
 };
 
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/cart" | "/graphiql" | "/subrequest-profiler" | "/.well-known/appspecific/com.chrome.devtools.json";
+    page: "/" | "/cart";
   };
   "routes/_index.tsx": {
     id: "routes/_index";
@@ -41,35 +32,10 @@ type RouteFiles = {
     id: "routes/cart";
     page: "/cart";
   };
-  "../node_modules/@shopify/hydrogen/dist/vite/virtual-routes/layout.jsx": {
-    id: "/Users/liliangrong/Desktop/work/cw3-insurance-headless-storefront/node_modules/@shopify/hydrogen/dist/vite/virtual-routes/layout";
-    page: "/graphiql" | "/subrequest-profiler" | "/.well-known/appspecific/com.chrome.devtools.json" | "/";
-  };
-  "../node_modules/@shopify/hydrogen/dist/vite/virtual-routes/routes/graphiql.jsx": {
-    id: "vite/virtual-routes/routes/graphiql";
-    page: "/graphiql";
-  };
-  "../node_modules/@shopify/hydrogen/dist/vite/virtual-routes/routes/subrequest-profiler.jsx": {
-    id: "vite/virtual-routes/routes/subrequest-profiler";
-    page: "/subrequest-profiler";
-  };
-  "../node_modules/@shopify/hydrogen/dist/vite/virtual-routes/routes/[.]well-known.appspecific.com[.]chrome[.]devtools[.]json.jsx": {
-    id: "vite/virtual-routes/routes/[.]well-known.appspecific.com[.]chrome[.]devtools[.]json";
-    page: "/.well-known/appspecific/com.chrome.devtools.json";
-  };
-  "../node_modules/@shopify/hydrogen/dist/vite/virtual-routes/routes/index.jsx": {
-    id: "vite/virtual-routes/routes/index";
-    page: "/";
-  };
 };
 
 type RouteModules = {
   "root": typeof import("./app/root.tsx");
   "routes/_index": typeof import("./app/routes/_index.tsx");
   "routes/cart": typeof import("./app/routes/cart.tsx");
-  "/Users/liliangrong/Desktop/work/cw3-insurance-headless-storefront/node_modules/@shopify/hydrogen/dist/vite/virtual-routes/layout": unknown;
-  "vite/virtual-routes/routes/graphiql": unknown;
-  "vite/virtual-routes/routes/subrequest-profiler": unknown;
-  "vite/virtual-routes/routes/[.]well-known.appspecific.com[.]chrome[.]devtools[.]json": unknown;
-  "vite/virtual-routes/routes/index": unknown;
 };
