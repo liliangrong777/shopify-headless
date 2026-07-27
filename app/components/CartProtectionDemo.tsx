@@ -1,54 +1,98 @@
 import {CartForm, type OptimisticCart} from '@shopify/hydrogen';
 import {
-  ShippingProtection,
+  ShippingProtectionWidget,
   type SdkCartData,
   type ShippingProtectionInfo,
+  type ShippingProtectionWidgetProps,
+  useShippingProtectionController,
 } from '@captain/shipping-protection-react';
-import {useEffect, useMemo, useRef, type ReactElement} from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from 'react';
 import {useFetcher, useRouteLoaderData} from 'react-router';
 import type {CartApiQueryFragment} from 'storefrontapi.generated';
-import {CAPTAIN_CART_ACTIONS} from '~/lib/cart-actions';
 import type {RootLoader} from '~/root';
 
 type CartProtectionDemoProps = {
   cart: OptimisticCart<CartApiQueryFragment | null>;
+  checkoutUrl?: string;
 };
 
 type CartActionResult = {
+  cart?: {
+    checkoutUrl?: string;
+  } | null;
   errors?: unknown[];
   warnings?: unknown[];
 };
 
 type PendingCartAction = {
   reject: (reason?: unknown) => void;
-  resolve: () => void;
+  resolve: (result: CartActionResult) => void;
 };
 
-type CaptainShippingProtectionWidgetProps = {
-  className?: string;
-  cart: SdkCartData;
-  country: string;
-  currency: string;
-  locale: string;
-  onInfoChange?: (info: ShippingProtectionInfo) => void;
-  onToggle: (
-    checked: boolean,
-    info: ShippingProtectionInfo,
-  ) => void | Promise<void>;
-  shop: string;
-};
+type CheckoutStage = 'idle' | 'preparing' | 'adding' | 'redirecting';
 
 function CaptainShippingProtectionWidget(
-  props: CaptainShippingProtectionWidgetProps,
+  props: ShippingProtectionWidgetProps,
 ): ReactElement | null {
-  return ShippingProtection(props) as unknown as ReactElement | null;
+  return ShippingProtectionWidget(props) as unknown as ReactElement | null;
 }
 
-export function CartProtectionDemo({cart}: CartProtectionDemoProps) {
+export function CartProtectionDemo({
+  cart,
+  checkoutUrl,
+}: CartProtectionDemoProps) {
   const rootData = useRouteLoaderData<RootLoader>('root');
+  const sdkCart = useMemo(() => toSdkCartData(cart), [cart]);
+
+  if (!sdkCart || !rootData?.publicStoreDomain) {
+    return <CheckoutLink checkoutUrl={checkoutUrl} />;
+  }
+
+  return (
+    <CartProtectionController
+      cart={cart}
+      checkoutUrl={checkoutUrl}
+      sdkCart={sdkCart}
+      shop={rootData.publicStoreDomain}
+    />
+  );
+}
+
+function CartProtectionController({
+  cart,
+  checkoutUrl,
+  sdkCart,
+  shop,
+}: {
+  cart: OptimisticCart<CartApiQueryFragment | null>;
+  checkoutUrl?: string;
+  sdkCart: SdkCartData;
+  shop: string;
+}) {
   const fetcher = useFetcher<CartActionResult>();
   const pendingCartAction = useRef<PendingCartAction | null>(null);
-  const sdkCart = useMemo(() => toSdkCartData(cart), [cart]);
+  const [checkoutPending, setCheckoutPending] = useState(false);
+  const [checkoutStage, setCheckoutStage] = useState<CheckoutStage>('idle');
+  const [checkoutError, setCheckoutError] = useState<unknown>(null);
+  const protection = useShippingProtectionController({
+    cart: sdkCart,
+    shop,
+    locale: 'en',
+    currency: sdkCart.currency,
+    country: 'US',
+    removeProtection: async (info) => {
+      const lineIds = findInsuranceLineIds(cart, info);
+      if (lineIds.length) {
+        await submitCartAction(CartForm.ACTIONS.LinesRemove, {lineIds});
+      }
+    },
+  });
 
   useEffect(() => {
     if (fetcher.state !== 'idle' || !pendingCartAction.current) return;
@@ -67,7 +111,7 @@ export function CartProtectionDemo({cart}: CartProtectionDemoProps) {
       return;
     }
 
-    pending.resolve();
+    pending.resolve(fetcher.data ?? {});
   }, [fetcher.data, fetcher.state]);
 
   useEffect(
@@ -80,23 +124,30 @@ export function CartProtectionDemo({cart}: CartProtectionDemoProps) {
     [],
   );
 
-  if (!sdkCart || !rootData?.publicStoreDomain) return null;
-
-  function submitCartAction(action: string, inputs: unknown) {
+  function submitCartAction(
+    action: string,
+    inputs: unknown,
+    options: {redirectToCheckout?: boolean} = {},
+  ) {
     if (pendingCartAction.current) {
       return Promise.reject(
         new Error('Captain shipping protection cart mutation already pending'),
       );
     }
 
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<CartActionResult>((resolve, reject) => {
       pendingCartAction.current = {resolve, reject};
+      const submission: Record<string, string> = {
+        [CartForm.INPUT_NAME]: JSON.stringify({action, inputs}),
+      };
+
+      if (options.redirectToCheckout) {
+        submission.redirectToCheckout = 'true';
+      }
 
       void fetcher
         .submit(
-          {
-            [CartForm.INPUT_NAME]: JSON.stringify({action, inputs}),
-          },
+          submission,
           {
             action: '/cart',
             method: 'POST',
@@ -111,74 +162,126 @@ export function CartProtectionDemo({cart}: CartProtectionDemoProps) {
     });
   }
 
-  async function handleToggle(checked: boolean, info: ShippingProtectionInfo) {
-    if (checked) {
-      await submitCartAction(CartForm.ACTIONS.LinesAdd, {
-        lines: [
-          {
-            merchandiseId: variantNumericIdToGid(info.variantsId),
-            quantity: 1,
-          },
-        ],
-      });
-      return;
-    }
+  async function handleCheckout() {
+    if (!checkoutUrl || checkoutPending || protection.removePending) return;
 
-    const lineIds = findInsuranceLineIds(cart, info);
-    if (lineIds.length) {
-      await submitCartAction(CartForm.ACTIONS.LinesRemove, {lineIds});
-    }
-  }
+    setCheckoutPending(true);
+    setCheckoutStage('preparing');
+    setCheckoutError(null);
 
-  function handleInfoChange(info: ShippingProtectionInfo) {
-    if (!info.includedProtection || info.isExcluded) return;
+    try {
+      const info = await protection.prepareCheckout();
 
-    const insuranceLines = findInsuranceLines(cart, info);
-    const targetVariantId = String(info.variantsId);
-    const staleLineIds = insuranceLines
-      .filter(
-        (line) =>
-          gidToNumericId(line.merchandise.id) !== targetVariantId,
-      )
-      .map((line) => line.id);
+      if (!info) {
+        setCheckoutStage('redirecting');
+        window.location.assign(checkoutUrl);
+        return;
+      }
 
-    if (!staleLineIds.length) return;
-
-    const hasTargetVariant = insuranceLines.some(
-      (line) => gidToNumericId(line.merchandise.id) === targetVariantId,
-    );
-    const action = hasTargetVariant
-      ? CartForm.ACTIONS.LinesRemove
-      : CAPTAIN_CART_ACTIONS.ProtectionLineReplace;
-    const inputs = hasTargetVariant
-      ? {lineIds: staleLineIds}
-      : {
-          lineIds: staleLineIds,
+      setCheckoutStage('adding');
+      await submitCartAction(
+        CartForm.ACTIONS.LinesAdd,
+        {
           lines: [
             {
               merchandiseId: variantNumericIdToGid(info.variantsId),
               quantity: 1,
             },
           ],
-        };
-
-    void submitCartAction(action, inputs).catch((error: unknown) => {
-      console.error('Captain shipping protection line sync failed', error);
-    });
+        },
+        {redirectToCheckout: true},
+      );
+    } catch (error: unknown) {
+      setCheckoutError(error);
+    } finally {
+      setCheckoutPending(false);
+      setCheckoutStage('idle');
+    }
   }
 
   return (
-    <CaptainShippingProtectionWidget
-      cart={sdkCart}
-      className="cart-protection-demo"
-      shop={rootData.publicStoreDomain}
-      locale="en"
-      currency={sdkCart.currency}
-      country="US"
-      onInfoChange={handleInfoChange}
-      onToggle={handleToggle}
-    />
+    <>
+      {protection.visible && protection.info ? (
+        <CaptainShippingProtectionWidget
+          checked={protection.checked}
+          className="cart-protection-demo"
+          currency={sdkCart.currency}
+          disabled={protection.togglePending || protection.removePending}
+          info={protection.info}
+          setting={protection.setting}
+          onToggle={(checked, info) => {
+            void protection.toggle(checked, info);
+          }}
+        />
+      ) : null}
+      {protection.removeError ? (
+        <small>Unable to refresh shipping protection. Please try again.</small>
+      ) : null}
+      {checkoutError ? (
+        <small>Unable to prepare checkout. Please try again.</small>
+      ) : null}
+      <CheckoutLink
+        checkoutUrl={checkoutUrl}
+        disabled={
+          checkoutPending ||
+          protection.infoPending ||
+          protection.initPending ||
+          protection.removePending
+        }
+        pending={checkoutPending}
+        pendingLabel={getCheckoutStageLabel(checkoutStage)}
+        onCheckout={() => {
+          void handleCheckout();
+        }}
+      />
+    </>
   );
+}
+
+function CheckoutLink({
+  checkoutUrl,
+  disabled = false,
+  onCheckout,
+  pending = false,
+  pendingLabel = 'Preparing Checkout...',
+}: {
+  checkoutUrl?: string;
+  disabled?: boolean;
+  onCheckout?: () => void;
+  pending?: boolean;
+  pendingLabel?: string;
+}) {
+  if (!checkoutUrl) return null;
+
+  return (
+    <div>
+      <a
+        aria-disabled={disabled}
+        href={checkoutUrl}
+        onClick={(event) => {
+          if (!onCheckout) return;
+          event.preventDefault();
+          if (!disabled) onCheckout();
+        }}
+      >
+        <p>{pending ? pendingLabel : 'Continue to Checkout →'}</p>
+      </a>
+      <br />
+    </div>
+  );
+}
+
+function getCheckoutStageLabel(stage: CheckoutStage) {
+  switch (stage) {
+    case 'preparing':
+      return 'Preparing protection...';
+    case 'adding':
+      return 'Adding protection...';
+    case 'redirecting':
+      return 'Opening checkout...';
+    default:
+      return 'Preparing Checkout...';
+  }
 }
 
 function toSdkCartData(

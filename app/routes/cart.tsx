@@ -1,10 +1,13 @@
-import {useLoaderData, data, type HeadersFunction} from 'react-router';
+import {
+  useLoaderData,
+  data,
+  redirect,
+  type HeadersFunction,
+} from 'react-router';
 import type {Route} from './+types/cart';
 import type {CartQueryDataReturn} from '@shopify/hydrogen';
 import {CartForm} from '@shopify/hydrogen';
-import type {CartLineInput} from '@shopify/hydrogen/storefront-api-types';
 import {CartMain} from '~/components/CartMain';
-import {CAPTAIN_CART_ACTIONS} from '~/lib/cart-actions';
 
 export const meta: Route.MetaFunction = () => {
   return [{title: `Hydrogen | Cart`}];
@@ -37,21 +40,6 @@ export async function action({request, context}: Route.ActionArgs) {
       case CartForm.ACTIONS.LinesRemove:
         result = await cart.removeLines(inputs.lineIds);
         break;
-      case CAPTAIN_CART_ACTIONS.ProtectionLineReplace: {
-        const replaceInputs = inputs as {
-          lineIds: string[];
-          lines: CartLineInput[];
-        };
-        const addResult = await cart.addLines(replaceInputs.lines);
-
-        if (cartMutationFailed(addResult)) {
-          result = addResult;
-          break;
-        }
-
-        result = await cart.removeLines(replaceInputs.lineIds);
-        break;
-      }
       case CartForm.ACTIONS.DiscountCodesUpdate: {
         const formDiscountCode = inputs.discountCode;
 
@@ -125,6 +113,15 @@ export async function action({request, context}: Route.ActionArgs) {
     status = 422;
   }
 
+  if (
+    formData.get('redirectToCheckout') === 'true' &&
+    cartResult &&
+    !errors.length &&
+    cartResult.checkoutUrl
+  ) {
+    return redirect(cartResult.checkoutUrl, {headers});
+  }
+
   const redirectTo = formData.get('redirectTo') ?? null;
   if (typeof redirectTo === 'string' && cartResult && !errors.length) {
     status = 303;
@@ -141,12 +138,6 @@ export async function action({request, context}: Route.ActionArgs) {
       },
     },
     {status, headers},
-  );
-}
-
-function cartMutationFailed(result: CartQueryDataReturn) {
-  return Boolean(
-    !result.cart || result.errors?.length || result.userErrors?.length,
   );
 }
 
