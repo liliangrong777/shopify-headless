@@ -17,7 +17,7 @@
   "prettier": "@shopify/prettier-config",
   "dependencies": {
     "@shopify/hydrogen": "*2026.1.1",
-    "captain-shipping-protection-react": "^0.1.0",
+    "captain-shipping-protection-react": "^0.1.1",
     "captain-shipping-protection-sdk": "^0.1.0",
     "graphql": "^16.10.0",
     "graphql-tag": "^2.12.6",
