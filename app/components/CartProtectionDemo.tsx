@@ -5,7 +5,7 @@ import {
   type ShippingProtectionInfo,
   type ShippingProtectionWidgetProps,
   useShippingProtectionController,
-} from '@captain/shipping-protection-react';
+} from 'captain-shipping-protection-react';
 import {
   useEffect,
   useMemo,

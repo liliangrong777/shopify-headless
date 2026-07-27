@@ -32,13 +32,7 @@
       "vite/client"
     ],
     "paths": {
-      "~/*": ["app/*"],
-      "@captain/shipping-protection-react": [
-        "../cw3-insurance-captain-web-client/SDK/shipping-protection-react/dist/index.d.ts"
-      ],
-      "@captain/shipping-protection-sdk": [
-        "../cw3-insurance-captain-web-client/SDK/shipping-protection-sdk/dist/index.d.ts"
-      ]
+      "~/*": ["app/*"]
     },
     "noEmit": true,
     "rootDirs": [".", "./.react-router/types"],
