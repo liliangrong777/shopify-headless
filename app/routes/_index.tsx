@@ -1,160 +1,169 @@
-import {CartForm, Image} from '@shopify/hydrogen';
-import {useLoaderData} from 'react-router';
+import {Await, useLoaderData, Link} from 'react-router';
 import type {Route} from './+types/_index';
-import {ProductPrice} from '~/components/ProductPrice';
-import {useAside} from '~/components/Aside';
+import {Suspense} from 'react';
+import {Image} from '@shopify/hydrogen';
+import type {
+  FeaturedCollectionFragment,
+  RecommendedProductsQuery,
+} from 'storefrontapi.generated';
+import {ProductItem} from '~/components/ProductItem';
+import {MockShopNotice} from '~/components/MockShopNotice';
 
 export const meta: Route.MetaFunction = () => {
-  return [
-    {title: 'Captain Insurance | Storefront cart test'},
-    {
-      name: 'description',
-      content: 'Storefront API product list and cart test page.',
-    },
-  ];
+  return [{title: 'Hydrogen | Home'}];
 };
 
-export async function loader({context}: Route.LoaderArgs) {
-  const {storefront} = context;
+export async function loader(args: Route.LoaderArgs) {
+  // Start fetching non-critical data without blocking time to first byte
+  const deferredData = loadDeferredData(args);
 
-  const {products} = await storefront.query(HOMEPAGE_PRODUCTS_QUERY, {
-    cache: storefront.CacheShort(),
-    variables: {
-      first: 12,
-    },
-  });
+  // Await the critical data required to render initial state of the page
+  const criticalData = await loadCriticalData(args);
 
-  return {products};
+  return {...deferredData, ...criticalData};
+}
+
+/**
+ * Load data necessary for rendering content above the fold. This is the critical data
+ * needed to render the page. If it's unavailable, the whole page should 400 or 500 error.
+ */
+async function loadCriticalData({context}: Route.LoaderArgs) {
+  const [{collections}] = await Promise.all([
+    context.storefront.query(FEATURED_COLLECTION_QUERY),
+    // Add other queries here, so that they are loaded in parallel
+  ]);
+
+  return {
+    isShopLinked: Boolean(context.env.PUBLIC_STORE_DOMAIN),
+    featuredCollection: collections.nodes[0],
+  };
+}
+
+/**
+ * Load data for rendering content below the fold. This data is deferred and will be
+ * fetched after the initial page load. If it's unavailable, the page should still 200.
+ * Make sure to not throw any errors here, as it will cause the page to 500.
+ */
+function loadDeferredData({context}: Route.LoaderArgs) {
+  const recommendedProducts = context.storefront
+    .query(RECOMMENDED_PRODUCTS_QUERY)
+    .catch((error: Error) => {
+      // Log query errors, but don't throw them so the page can still render
+      console.error(error);
+      return null;
+    });
+
+  return {
+    recommendedProducts,
+  };
 }
 
 export default function Homepage() {
-  const {products} = useLoaderData<typeof loader>();
-
+  const data = useLoaderData<typeof loader>();
   return (
     <div className="home">
-      <section className="home-hero">
-        <p className="eyebrow">Captain Insurance compatibility demo</p>
-        <h1>Storefront API cart test</h1>
-        <p>
-          This single-page storefront loads live Shopify products and lets you
-          add variants to the cart for Captain Insurance integration testing.
-        </p>
-      </section>
-
-      <section className="products-grid" aria-label="Products">
-        {products.nodes.map((product) => {
-          const variant = product.variants.nodes[0];
-          const image = product.featuredImage;
-          const canAdd = Boolean(variant?.id && variant.availableForSale);
-
-          return (
-            <article className="product-item" key={product.id}>
-              {image ? (
-                <Image
-                  alt={image.altText || product.title}
-                  aspectRatio="1/1"
-                  data={image}
-                  loading="lazy"
-                  sizes="(min-width: 45em) 25vw, 50vw"
-                />
-              ) : (
-                <div className="product-image-placeholder" />
-              )}
-              <div className="product-card-body">
-                <p className="product-vendor">{product.vendor}</p>
-                <h2>{product.title}</h2>
-                <ProductPrice
-                  price={variant?.price}
-                  compareAtPrice={variant?.compareAtPrice}
-                />
-                <AddToCartButton
-                  availableForSale={canAdd}
-                  merchandiseId={variant?.id}
-                />
-              </div>
-            </article>
-          );
-        })}
-      </section>
+      {data.isShopLinked ? null : <MockShopNotice />}
+      <FeaturedCollection collection={data.featuredCollection} />
+      <RecommendedProducts products={data.recommendedProducts} />
     </div>
   );
 }
 
-function AddToCartButton({
-  availableForSale,
-  merchandiseId,
+function FeaturedCollection({
+  collection,
 }: {
-  availableForSale: boolean;
-  merchandiseId?: string;
+  collection: FeaturedCollectionFragment;
 }) {
-  const {open} = useAside();
-
-  if (!merchandiseId) {
-    return (
-      <button className="add-to-cart" disabled type="button">
-        Unavailable
-      </button>
-    );
-  }
-
+  if (!collection) return null;
+  const image = collection?.image;
   return (
-    <CartForm
-      route="/cart"
-      action={CartForm.ACTIONS.LinesAdd}
-      inputs={{
-        lines: [
-          {
-            merchandiseId,
-            quantity: 1,
-          },
-        ],
-      }}
+    <Link
+      className="featured-collection"
+      to={`/collections/${collection.handle}`}
     >
-      <button
-        className="add-to-cart"
-        disabled={!availableForSale}
-        onClick={() => open('cart')}
-        type="submit"
-      >
-        {availableForSale ? 'Add to cart' : 'Sold out'}
-      </button>
-    </CartForm>
+      {image && (
+        <div className="featured-collection-image">
+          <Image data={image} sizes="100vw" />
+        </div>
+      )}
+      <h1>{collection.title}</h1>
+    </Link>
   );
 }
 
-const HOMEPAGE_PRODUCTS_QUERY = `#graphql
-  query HomepageProducts(
-    $country: CountryCode
-    $first: Int!
-    $language: LanguageCode
-  ) @inContext(country: $country, language: $language) {
-    products(first: $first, sortKey: UPDATED_AT, reverse: true) {
+function RecommendedProducts({
+  products,
+}: {
+  products: Promise<RecommendedProductsQuery | null>;
+}) {
+  return (
+    <div className="recommended-products">
+      <h2>Recommended Products</h2>
+      <Suspense fallback={<div>Loading...</div>}>
+        <Await resolve={products}>
+          {(response) => (
+            <div className="recommended-products-grid">
+              {response
+                ? response.products.nodes.map((product) => (
+                    <ProductItem key={product.id} product={product} />
+                  ))
+                : null}
+            </div>
+          )}
+        </Await>
+      </Suspense>
+      <br />
+    </div>
+  );
+}
+
+const FEATURED_COLLECTION_QUERY = `#graphql
+  fragment FeaturedCollection on Collection {
+    id
+    title
+    image {
+      id
+      url
+      altText
+      width
+      height
+    }
+    handle
+  }
+  query FeaturedCollection($country: CountryCode, $language: LanguageCode)
+    @inContext(country: $country, language: $language) {
+    collections(first: 1, sortKey: UPDATED_AT, reverse: true) {
       nodes {
-        id
-        title
-        vendor
-        handle
-        featuredImage {
-          id
-          url
-          altText
-          width
-          height
-        }
-        variants(first: 1) {
-          nodes {
-            id
-            availableForSale
-            price {
-              amount
-              currencyCode
-            }
-            compareAtPrice {
-              amount
-              currencyCode
-            }
-          }
-        }
+        ...FeaturedCollection
+      }
+    }
+  }
+` as const;
+
+const RECOMMENDED_PRODUCTS_QUERY = `#graphql
+  fragment RecommendedProduct on Product {
+    id
+    title
+    handle
+    priceRange {
+      minVariantPrice {
+        amount
+        currencyCode
+      }
+    }
+    featuredImage {
+      id
+      url
+      altText
+      width
+      height
+    }
+  }
+  query RecommendedProducts ($country: CountryCode, $language: LanguageCode)
+    @inContext(country: $country, language: $language) {
+    products(first: 4, sortKey: UPDATED_AT, reverse: true) {
+      nodes {
+        ...RecommendedProduct
       }
     }
   }

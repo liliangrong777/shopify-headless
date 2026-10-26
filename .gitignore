@@ -4,3 +4,10 @@ node_modules
 
 .dev.vars
 .wrangler
+.env
+/dist
+/build
+.react-router
+/.cache
+/public/build
+/.mf
