@@ -15,6 +15,10 @@ import {
 import { CartAnalyticsTracker, PageViewedTracker } from "~/components/AnalyticsTrackers";
 import { AnnouncementBar } from "~/components/AnnouncementBar";
 import { CartDrawer } from "~/components/CartDrawer";
+import {
+  captainShopDomain,
+  ShippingProtectionProvider,
+} from "~/components/ShippingProtection";
 import { Footer } from "~/components/Footer";
 import { Header } from "~/components/Header";
 import { SearchDrawer } from "~/components/SearchDrawer";
@@ -149,14 +153,18 @@ export function Layout({ children }: { children: ReactNode }) {
 export default function App({ loaderData }: Route.ComponentProps) {
   return (
     <CartProvider initialData={loaderData.cartData}>
-      <PageViewedTracker />
-      <CartAnalyticsTracker />
-      <AnnouncementBar />
-      <Header shopInfo={loaderData.shopInfo} />
-      <Outlet />
-      <Footer shopInfo={loaderData.shopInfo} />
-      <CartDrawer />
-      <SearchDrawer />
+      <ShippingProtectionProvider
+        shop={captainShopDomain(loaderData.shopIdentity.scriptShop.myshopifyDomain)}
+      >
+        <PageViewedTracker />
+        <CartAnalyticsTracker />
+        <AnnouncementBar />
+        <Header shopInfo={loaderData.shopInfo} />
+        <Outlet />
+        <Footer shopInfo={loaderData.shopInfo} />
+        <CartDrawer />
+        <SearchDrawer />
+      </ShippingProtectionProvider>
     </CartProvider>
   );
 }

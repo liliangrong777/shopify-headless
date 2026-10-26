@@ -6,6 +6,7 @@ import { useCart, useCartForm } from "~/lib/cart";
 import { closeCartDrawer, configureOpenCartAction, CART_DRAWER_ID } from "~/lib/cart-drawer";
 import { formatPrice } from "~/lib/money";
 
+import { ShippingProtectionCheckout, ShippingProtectionOffer } from "./ShippingProtection";
 import { publishCartViewed } from "./AnalyticsTrackers";
 
 function CartErrorBanner() {
@@ -257,15 +258,11 @@ function CartFooter() {
         <p className="text-on-surface-secondary text-xs">
           Taxes and shipping calculated at checkout
         </p>
+        <ShippingProtectionOffer />
         {cart.checkoutUrl ? (
           <>
             <ShopPayButton width="100%" borderRadius="8px" />
-            <a
-              href={cart.checkoutUrl}
-              className="rounded-button button-primary focus-visible:outline-accent inline-flex h-11 w-full items-center justify-center gap-2 px-4 text-sm font-medium no-underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-[color,background-color,border-color,transform] motion-safe:active:scale-[0.97]"
-            >
-              Checkout
-            </a>
+            <ShippingProtectionCheckout />
           </>
         ) : null}
       </div>
