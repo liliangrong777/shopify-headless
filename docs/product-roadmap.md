@@ -1,6 +1,6 @@
 # 产品路书：cw3-insurance-headless-storefront
 
-状态：2026-10-26 已按第 9 节默认开工。店面代码已对齐 Hydrogen Skeleton `2026.1.1`。客户账号登录仍取决于本机 Customer Account 环境变量。
+状态：2026-10-26 已换成 Hydrogen 2026.10 的 React Router 模板。本地开发需要 Node 22，地址是 http://localhost:5173/ 。客户账号仍要 `SHOP_ID`、`PUBLIC_CUSTOMER_ACCOUNT_API_CLIENT_ID` 和 HTTPS。
 
 ## 1. 这份文档做什么
 
